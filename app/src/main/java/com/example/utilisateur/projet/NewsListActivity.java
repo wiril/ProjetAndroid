@@ -3,6 +3,7 @@ package com.example.utilisateur.projet;
 import android.app.ListActivity;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
@@ -31,23 +32,19 @@ import static android.content.ContentValues.TAG;
 public class NewsListActivity extends ListActivity {
 
     private ArrayList<HashMap<String, String>> listItem;
+    private static ArrayList<Bitmap> pictures;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        listItem = DataHolder.getInstance().getData();
-
-        Log.e(TAG,"ListItem length : " + listItem.size());
-
-        int[] resourceList = new int[2];
-        resourceList[0]= R.layout.activity_main;
-        resourceList[1]= R.layout.activity_main_mirror;
+        listItem = DataHolder.getInstance().getListItem();
+        pictures = DataHolder.getInstance().getPictures();
 
         MirrorAdapter mSchedule = new MirrorAdapter(this.getBaseContext(), listItem,
-                resourceList,
-                new String[]{"title", "author", "date"}, new int[]{R.id.title,
-                R.id.author, R.id.date});
+                R.layout.activity_main,
+                new String[]{"title", "author", "date", "imageView_left", "imageView_right"}, new int[]{R.id.title,
+                R.id.author, R.id.date, R.id.imageView_left, R.id.imageView_right});
         //On attribut à notre listActivity l'adapter que l'on vient de créer
         setListAdapter(mSchedule);
     }
@@ -74,9 +71,6 @@ public class NewsListActivity extends ListActivity {
         private int mResource;
         private int mDropDownResource;
 
-        private int[] resourceList;
-        private int chosenResource = 0;
-
         /** Layout inflater used for {@link #getDropDownView(int, View, ViewGroup)}. */
         private LayoutInflater mDropDownInflater;
 
@@ -99,10 +93,9 @@ public class NewsListActivity extends ListActivity {
          *        in the from parameter.
          */
         public MirrorAdapter(Context context, List<? extends Map<String, ?>> data,
-                             @LayoutRes int[] resource, String[] from, @IdRes int[] to) {
+                             @LayoutRes int resource, String[] from, @IdRes int[] to) {
             mData = data;
-            mResource = mDropDownResource = resource[0];
-            resourceList = resource;
+            mResource = mDropDownResource = resource;
             mFrom = from;
             mTo = to;
             mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -133,26 +126,18 @@ public class NewsListActivity extends ListActivity {
          * @see android.widget.Adapter#getView(int, View, ViewGroup)
          */
         public View getView(int position, View convertView, ViewGroup parent) {
-            return createViewFromResource(mInflater, position, convertView, parent, resourceList);
+            return createViewFromResource(mInflater, position, convertView, parent, mResource);
         }
 
         private View createViewFromResource(LayoutInflater inflater, int position, View convertView,
-                                            ViewGroup parent, int[] resource) {
+                                            ViewGroup parent, int resource) {
             View v;
             if (convertView == null) {
-                v = inflater.inflate(resource[chosenResource], parent, false);
-                if (chosenResource==resource.length-1){
-                    chosenResource=0;
-                }
-                else{
-                    chosenResource++;
-                }
+                v = inflater.inflate(resource, parent, false);
             } else {
                 v = convertView;
             }
-
             bindView(position, v);
-
             return v;
         }
 
@@ -197,7 +182,7 @@ public class NewsListActivity extends ListActivity {
         @Override
         public View getDropDownView(int position, View convertView, ViewGroup parent) {
             final LayoutInflater inflater = mDropDownInflater == null ? mInflater : mDropDownInflater;
-            return createViewFromResource(inflater, position, convertView, parent, resourceList);
+            return createViewFromResource(inflater, position, convertView, parent, mResource);
         }
 
         private void bindView(int position, View view) {
@@ -212,6 +197,20 @@ public class NewsListActivity extends ListActivity {
             final int count = to.length;
 
             for (int i = 0; i < count; i++) {
+                if (!pictures.isEmpty()){
+                    final ImageView imv;
+                    if(position%2==0){
+                        imv = (ImageView) view.findViewById(R.id.imageView_left);
+                        view.findViewById(R.id.imageView_right).setVisibility(View.GONE);
+                    }
+                    else{
+                        imv = (ImageView) view.findViewById(R.id.imageView_right);
+                        view.findViewById(R.id.imageView_left).setVisibility(View.GONE);
+                    }
+                    //Log.e("picture is null "," "+(pictures.get(position)==null));
+                    imv.setImageBitmap(pictures.get(position));
+                    imv.setVisibility(View.VISIBLE);
+                }
                 final View v = view.findViewById(to[i]);
                 if (v != null) {
                     final Object data = dataSet.get(from[i]);
@@ -246,7 +245,16 @@ public class NewsListActivity extends ListActivity {
                             if (data instanceof Integer) {
                                 setViewImage((ImageView) v, (Integer) data);
                             } else {
-                                setViewImage((ImageView) v, text);
+                                if (text != ""){
+                                    if(position%2==0){
+                                        view.findViewById(R.id.imageView_right).setVisibility(View.GONE);
+                                    }
+                                    else{
+                                        view.findViewById(R.id.imageView_left).setVisibility(View.GONE);
+                                    }
+                                    v.setVisibility(View.VISIBLE);
+                                    setViewImage((ImageView) v, text);
+                                }
                             }
                         } else {
                             throw new IllegalStateException(v.getClass().getName() + " is not a " +
@@ -318,6 +326,7 @@ public class NewsListActivity extends ListActivity {
             try {
                 v.setImageResource(Integer.parseInt(value));
             } catch (NumberFormatException nfe) {
+                Log.e(TAG,"setViewImage failed"+value);
                 v.setImageURI(Uri.parse(value));
             }
         }

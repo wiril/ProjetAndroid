@@ -2,6 +2,8 @@ package com.example.utilisateur.projet;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -22,6 +24,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Array;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +35,7 @@ public class SplashScreenActivity extends AppCompatActivity {
 
     private String url_string = "le-monde";
     private ArrayList<HashMap<String, String>> listItem;
+    private ArrayList<Bitmap> pictures = new ArrayList<Bitmap>();
     private ProgressBar progressBar;
     private double progressStatus = 0.;
 
@@ -44,7 +48,6 @@ public class SplashScreenActivity extends AppCompatActivity {
 
         listItem = new ArrayList<HashMap<String, String>>();
 
-        Log.e(TAG,"ListItem length : " + listItem.size());
         new SplashScreenActivity.JSONAsyncTask("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+url_string).execute();
 
     }
@@ -85,6 +88,45 @@ public class SplashScreenActivity extends AppCompatActivity {
                             map.put("author", theObject.getJSONObject(i).getString("author"));
                         }
                         map.put("date", theObject.getJSONObject(i).getString("publishedAt"));
+
+                        String image_url = theObject.getJSONObject(i).getString("urlToImage");
+                        //Log.e("image_url",image_url);
+                        if (image_url =="null"){
+                            //Log.e(TAG, "image url is 'null'");
+                            if(url_string=="google-news-fr"){
+                                //Log.e(TAG, "source is google news");
+                                if(i%2==0){
+                                    map.put("imageView_left", String.valueOf(R.drawable.google_news_logo));
+                                    map.put("imageView_right", "");
+                                }
+                                else{
+                                    map.put("imageView_right", String.valueOf(R.drawable.google_news_logo));
+                                    map.put("imageView_left", "");
+                                }
+                            }
+                            if(url_string=="le-monde"){
+                                //Log.e(TAG, "source is le monde");
+                                if(i%2==0){
+                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
+                                    map.put("imageView_right", "");
+                                }
+                                else{
+                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
+                                    map.put("imageView_right", "");
+                                }
+                            }
+                        }
+                        else{
+                            Bitmap mIcon11;
+                            try {
+                                InputStream in = new java.net.URL(image_url).openStream();
+                                mIcon11 = BitmapFactory.decodeStream(in);
+                                pictures.add(mIcon11);
+                            } catch (Exception e) {
+                                Log.e("Image dwnlding error : ", e.getMessage());
+                                e.printStackTrace();
+                            }
+                        }
                         //if(url_string=="google-new-fr"){
                         //    if (theObject.getJSONObject(i).getString("urlToImage")!= null){
                         //        map.put("imageView", theObject.getJSONObject(i).getString("urlToImage"));
@@ -118,9 +160,11 @@ public class SplashScreenActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(Boolean result) {
             DataHolder.getInstance().setData(listItem);
+            DataHolder.getInstance().setPictures(pictures);
             Intent nonIntent = new Intent(SplashScreenActivity.this, NewsListActivity.class);
             startActivity(nonIntent);
             finish();
+            super.onPostExecute(result);
         }
 
         @Override
