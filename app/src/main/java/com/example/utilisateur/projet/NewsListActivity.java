@@ -2,9 +2,11 @@ package com.example.utilisateur.projet;
 
 import android.app.ListActivity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.provider.ContactsContract;
 import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
 import android.os.Bundle;
@@ -18,6 +20,7 @@ import android.widget.Checkable;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.ThemedSpinnerAdapter;
 import android.widget.Toast;
@@ -450,5 +453,16 @@ public class NewsListActivity extends ListActivity {
                 }
             }
         }
+    }
+
+    @Override
+    protected void onListItemClick(ListView l, View v, int position, long id) {
+        //faudra aussi gérer la transmission de l'image. 2 solutions : la retélécharger, ou réussir à la carry d'une manière ou d'une autre.
+        HashMap<String, String> map = listItem.get(position);
+        Intent nonIntent = new Intent(NewsListActivity.this, NewsDetails.class);
+        for (Map.Entry<String, String> entry : map.entrySet()){
+            nonIntent.putExtra(entry.getKey(),entry.getValue());
+        }
+        startActivity(nonIntent);
     }
 }

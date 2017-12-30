@@ -87,7 +87,29 @@ public class SplashScreenActivity extends AppCompatActivity {
                         if(theObject.getJSONObject(i).getString("author")!="null"){
                             map.put("author", theObject.getJSONObject(i).getString("author"));
                         }
-                        map.put("date", theObject.getJSONObject(i).getString("publishedAt"));
+                        String date = theObject.getJSONObject(i).getString("publishedAt");
+                        char[] date_char = date.toCharArray();
+                        char[] resultdate = new char[date_char.length];
+                        resultdate[0]=date_char[8];
+                        resultdate[1]=date_char[9];
+                        resultdate[2]='-';
+                        resultdate[3]=date_char[5];
+                        resultdate[4]=date_char[6];
+                        resultdate[5]='-';
+                        for(int j=6;j<=9;j++){resultdate[j]=date_char[j-6];}
+                        resultdate[10]=' ';
+                        for(int j=11;j<=18;j++){resultdate[j]=date_char[j];}
+                        date = new String(resultdate);
+                        map.put("date", date);
+                        map.put("description", theObject.getJSONObject(i).getString("description"));
+                        map.put("url", theObject.getJSONObject(i).getString("url"));
+
+                        if(url_string=="le-monde"){
+                            map.put("source", "Le Monde");
+                        }
+                        else if(url_string=="google-news-fr"){
+                            map.put("source", "Google News");
+                        }
 
                         String image_url = theObject.getJSONObject(i).getString("urlToImage");
                         //Log.e("image_url",image_url);
