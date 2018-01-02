@@ -459,6 +459,12 @@ public class NewsListActivity extends ListActivity {
     protected void onListItemClick(ListView l, View v, int position, long id) {
         //faudra aussi gérer la transmission de l'image. 2 solutions : la retélécharger, ou réussir à la carry d'une manière ou d'une autre.
         HashMap<String, String> map = listItem.get(position);
+        ImageView imv = (ImageView) v.findViewById(R.id.imageView_left);
+        if(imv.getVisibility()== View.GONE){
+            imv = (ImageView) v.findViewById(R.id.imageView_right);
+        }
+        DataHolder.getInstance().setDrawable(imv.getDrawable());
+
         Intent nonIntent = new Intent(NewsListActivity.this, NewsDetails.class);
         for (Map.Entry<String, String> entry : map.entrySet()){
             nonIntent.putExtra(entry.getKey(),entry.getValue());

@@ -1,16 +1,20 @@
 package com.example.utilisateur.projet;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.drawable.Drawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -24,16 +28,13 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Array;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import static android.content.ContentValues.TAG;
-
 public class SplashScreenActivity extends AppCompatActivity {
 
-    private String url_string = "le-monde";
+    private int source_name;
+    private String[] source_list;
     private ArrayList<HashMap<String, String>> listItem;
     private ArrayList<Bitmap> pictures = new ArrayList<Bitmap>();
     private ProgressBar progressBar;
@@ -47,9 +48,28 @@ public class SplashScreenActivity extends AppCompatActivity {
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
 
         listItem = new ArrayList<HashMap<String, String>>();
+        source_name = 1;
 
-        new SplashScreenActivity.JSONAsyncTask("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+url_string).execute();
-
+        if(networkAvailable()){
+            new SplashScreenActivity.JSONAsyncTask("https://newsapi.org/v2/sources?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr").execute();
+        }
+        else{
+            AlertDialog.Builder builder = new AlertDialog.Builder(SplashScreenActivity.this);
+            builder.setTitle("Pas de connexion")
+                    .setMessage("Aucune connexion internet n'a été détectée.")
+                    .setPositiveButton("Réessayer", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            SplashScreenActivity.this.recreate();
+                        }
+                    })
+                    .setNegativeButton("Annuler", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            finish();
+                        }
+                    })
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .show();
+        }
     }
 
     class JSONAsyncTask extends AsyncTask<String, Void, Boolean> {
@@ -66,7 +86,26 @@ public class SplashScreenActivity extends AppCompatActivity {
             try {
 
                 //------------------>>
-                HttpGet httppost = new HttpGet(target_URL);
+                HttpGet firsthttppost = new HttpGet(target_URL);
+                HttpClient firsthttpclient = new DefaultHttpClient();
+                HttpResponse firstresponse = firsthttpclient.execute(firsthttppost);
+
+                // StatusLine stat = response.getStatusLine();
+                int firststatus = firstresponse.getStatusLine().getStatusCode();
+
+                if (firststatus == 200) {
+                    HttpEntity entity = firstresponse.getEntity();
+                    String data = EntityUtils.toString(entity);
+
+                    JSONObject firstjsono = new JSONObject(data);
+                    JSONArray firsttheObject =firstjsono.getJSONArray("sources");
+                    int sources_number = firsttheObject.length();
+                    source_list = new String[sources_number];
+                    for (int i = 0; i < sources_number; i++) {
+                        source_list[i] = firsttheObject.getJSONObject(i).getString("id");
+                    }
+                }
+                HttpGet httppost = new HttpGet("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+source_list[source_name]);
                 HttpClient httpclient = new DefaultHttpClient();
                 HttpResponse response = httpclient.execute(httppost);
 
@@ -104,18 +143,27 @@ public class SplashScreenActivity extends AppCompatActivity {
                         map.put("description", theObject.getJSONObject(i).getString("description"));
                         map.put("url", theObject.getJSONObject(i).getString("url"));
 
-                        if(url_string=="le-monde"){
+                        if(source_list[source_name].equals("le-monde")){
                             map.put("source", "Le Monde");
                         }
-                        else if(url_string=="google-news-fr"){
+                        else if(source_list[source_name].equals("google-news-fr")){
                             map.put("source", "Google News");
+                        }
+                        else if(source_list[source_name].equals("lequipe")){
+                            map.put("source", "L'Équipe");
+                        }
+                        else if(source_list[source_name].equals("les-echos")){
+                            map.put("source", "Les Échos");
+                        }
+                        else if(source_list[source_name].equals("liberation")){
+                            map.put("source", "Libération");
                         }
 
                         String image_url = theObject.getJSONObject(i).getString("urlToImage");
                         //Log.e("image_url",image_url);
                         if (image_url =="null"){
                             //Log.e(TAG, "image url is 'null'");
-                            if(url_string=="google-news-fr"){
+                            if(source_list[source_name].equals("google-news-fr")){
                                 //Log.e(TAG, "source is google news");
                                 if(i%2==0){
                                     map.put("imageView_left", String.valueOf(R.drawable.google_news_logo));
@@ -126,7 +174,7 @@ public class SplashScreenActivity extends AppCompatActivity {
                                     map.put("imageView_left", "");
                                 }
                             }
-                            if(url_string=="le-monde"){
+                            if(source_list[source_name].equals("le-monde")){
                                 //Log.e(TAG, "source is le monde");
                                 if(i%2==0){
                                     map.put("imageView_left", String.valueOf(R.drawable.le_monde));
@@ -149,14 +197,6 @@ public class SplashScreenActivity extends AppCompatActivity {
                                 e.printStackTrace();
                             }
                         }
-                        //if(url_string=="google-new-fr"){
-                        //    if (theObject.getJSONObject(i).getString("urlToImage")!= null){
-                        //        map.put("imageView", theObject.getJSONObject(i).getString("urlToImage"));
-                        //    }
-                        //    else{
-                        //        map.put("imageView", theObject.getJSONObject(i).getString("urlToImage"));
-                        //    }
-                        //}
                         listItem.add(map);
                         progressStatus+=100./articles_number;
                         if (progressStatus<=100){
@@ -194,5 +234,12 @@ public class SplashScreenActivity extends AppCompatActivity {
             super.onPreExecute();
         }
 
+    }
+
+    private boolean networkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 }

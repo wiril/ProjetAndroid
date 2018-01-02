@@ -1,11 +1,13 @@
 package com.example.utilisateur.projet;
 
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 public class NewsDetails extends AppCompatActivity {
@@ -14,6 +16,10 @@ public class NewsDetails extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_news_details);
+        Drawable carried_picture = DataHolder.getInstance().getDrawable();
+        ImageView imv = (ImageView) findViewById(R.id.imageView);
+        imv.setVisibility(View.VISIBLE);
+        imv.setImageDrawable(carried_picture);
         Bundle b = getIntent().getExtras();
         if(b!=null) {
             String source = (String) b.get("source");
