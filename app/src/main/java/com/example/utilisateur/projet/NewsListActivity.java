@@ -1,11 +1,15 @@
 package com.example.utilisateur.projet;
 
 import android.app.ListActivity;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Handler;
 import android.provider.ContactsContract;
 import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
@@ -15,6 +19,7 @@ import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.Checkable;
 import android.widget.Filter;
@@ -25,6 +30,18 @@ import android.widget.TextView;
 import android.widget.ThemedSpinnerAdapter;
 import android.widget.Toast;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,10 +49,26 @@ import java.util.Map;
 
 import static android.content.ContentValues.TAG;
 
-public class NewsListActivity extends ListActivity {
+public class NewsListActivity extends ListActivity implements AbsListView.OnScrollListener {
 
-    private ArrayList<HashMap<String, String>> listItem;
+    private static ArrayList<HashMap<String, String>> listItem;
     private static ArrayList<Bitmap> pictures;
+    private View mFooterView;
+    private boolean mIsLoading = false;
+    private boolean mWasLoading = false;
+    private Handler mHandler;
+    private MirrorAdapter mSchedule;
+    private static int numberOfPages = 1;
+    private String[] source_list;
+    private static int source_name;
+
+    private Runnable mAddItemsRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mSchedule.addMoreItems();
+            mIsLoading = false;
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -43,26 +76,57 @@ public class NewsListActivity extends ListActivity {
 
         listItem = DataHolder.getInstance().getListItem();
         pictures = DataHolder.getInstance().getPictures();
+        Bundle b = getIntent().getExtras();
+        source_list = (String[]) b.get("source_list");
+        source_name = (int) b.get("source_name");
 
-        MirrorAdapter mSchedule = new MirrorAdapter(this.getBaseContext(), listItem,
+        mSchedule = new MirrorAdapter(this.getBaseContext(), listItem,
                 R.layout.activity_main,
                 new String[]{"title", "author", "date", "imageView_left", "imageView_right"}, new int[]{R.id.title,
                 R.id.author, R.id.date, R.id.imageView_left, R.id.imageView_right});
-        //On attribut à notre listActivity l'adapter que l'on vient de créer
+        mHandler = new Handler();
+        mFooterView = LayoutInflater.from(this).inflate(R.layout.loading_view, null);
+        getListView().addFooterView(mFooterView);
         setListAdapter(mSchedule);
+        getListView().setOnScrollListener(this);
     }
 
-    public void showToast(final String toast){ //créer un toast depuis un thread autre que UIThread
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(NewsListActivity.this, toast, Toast.LENGTH_SHORT).show();
+    @Override
+    public void onScroll(AbsListView view, int firstVisibleItem,
+                         int visibleItemCount, int totalItemCount) {
+        if (!mIsLoading) {
+            if (totalItemCount <= firstVisibleItem + visibleItemCount) {
+                mIsLoading = true;
+                mHandler.postDelayed(mAddItemsRunnable, 1000);
             }
-        });
+        }
+    }
+
+    @Override
+    public void onScrollStateChanged(AbsListView view, int scrollState) {
+        // Ignore
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (mWasLoading) {
+            mWasLoading = false;
+            mIsLoading = true;
+            mHandler.postDelayed(mAddItemsRunnable, 1000);
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        mHandler.removeCallbacks(mAddItemsRunnable);
+        mWasLoading = mIsLoading;
+        mIsLoading = false;
     }
 
     //similar structure with SimpleAdapter :
-    public static class MirrorAdapter extends BaseAdapter implements Filterable, ThemedSpinnerAdapter {
+    public class MirrorAdapter extends BaseAdapter implements Filterable, ThemedSpinnerAdapter {
         private final LayoutInflater mInflater;
 
         private int[] mTo;
@@ -353,6 +417,11 @@ public class NewsListActivity extends ListActivity {
             return mFilter;
         }
 
+        public void addMoreItems() {
+            numberOfPages++ ;
+            new NewsListActivity.JSONAsyncTask("https://newsapi.org/v2/sources?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr").execute();
+        }
+
         /**
          * This class can be used by external clients of SimpleAdapter to bind
          * values to views.
@@ -365,7 +434,7 @@ public class NewsListActivity extends ListActivity {
          * @see android.widget.SimpleAdapter#setViewImage(ImageView, String)
          * @see android.widget.SimpleAdapter#setViewText(TextView, String)
          */
-        public static interface ViewBinder {
+        //public interface ViewBinder {
             /**
              * Binds the specified data to the specified view.
              *
@@ -381,8 +450,8 @@ public class NewsListActivity extends ListActivity {
              *
              * @return true if the data was bound to the view, false otherwise
              */
-            boolean setViewValue(View view, Object data, String textRepresentation);
-        }
+        //    boolean setViewValue(View view, Object data, String textRepresentation);
+        //}
 
         /**
          * <p>An array filters constrains the content of the array adapter with
@@ -470,5 +539,138 @@ public class NewsListActivity extends ListActivity {
             nonIntent.putExtra(entry.getKey(),entry.getValue());
         }
         startActivity(nonIntent);
+    }
+
+    class JSONAsyncTask extends AsyncTask<String, Void, Boolean> {
+
+        String target_URL;
+        private ProgressDialog pDialog;
+
+        public JSONAsyncTask(String url) {
+            this.target_URL = url;
+        }
+
+        @Override
+        protected Boolean doInBackground(String... urls) {
+            try {
+                HttpGet httppost = new HttpGet("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+source_list[source_name]+"&page="+numberOfPages);
+                HttpClient httpclient = new DefaultHttpClient();
+                HttpResponse response = httpclient.execute(httppost);
+                // StatusLine stat = response.getStatusLine();
+                int status = response.getStatusLine().getStatusCode();
+
+                if (status == 200) {
+                    HttpEntity entity = response.getEntity();
+                    String data = EntityUtils.toString(entity);
+
+                    JSONObject jsono = new JSONObject(data);
+                    JSONArray theObject = jsono.getJSONArray("articles");
+
+                    int articles_number = theObject.length();
+                    for(int i=0; i<articles_number; i++){
+                        HashMap<String, String> map = new HashMap<String, String>();
+                        map.put("title", theObject.getJSONObject(i).getString("title"));
+                        if(theObject.getJSONObject(i).getString("author")!="null"){
+                            map.put("author", theObject.getJSONObject(i).getString("author"));
+                        }
+                        String date = theObject.getJSONObject(i).getString("publishedAt");
+                        char[] date_char = date.toCharArray();
+                        char[] resultdate = new char[date_char.length];
+                        resultdate[0]=date_char[8];
+                        resultdate[1]=date_char[9];
+                        resultdate[2]='-';
+                        resultdate[3]=date_char[5];
+                        resultdate[4]=date_char[6];
+                        resultdate[5]='-';
+                        for(int j=6;j<=9;j++){resultdate[j]=date_char[j-6];}
+                        resultdate[10]=' ';
+                        for(int j=11;j<=18;j++){resultdate[j]=date_char[j];}
+                        date = new String(resultdate);
+                        map.put("date", date);
+                        map.put("description", theObject.getJSONObject(i).getString("description"));
+                        map.put("url", theObject.getJSONObject(i).getString("url"));
+
+                        switch (source_list[source_name]) {
+                            case "le-monde":
+                                map.put("source", "Le Monde");
+                                break;
+                            case "google-news-fr":
+                                map.put("source", "Google News");
+                                break;
+                            case "lequipe":
+                                map.put("source", "L'Équipe");
+                                break;
+                            case "les-echos":
+                                map.put("source", "Les Échos");
+                                break;
+                            case "liberation":
+                                map.put("source", "Libération");
+                                break;
+                        }
+
+                        String image_url = theObject.getJSONObject(i).getString("urlToImage");
+                        //Log.e("image_url",image_url);
+                        if (image_url.equals("null")){
+                            //Log.e(TAG, "image url is 'null'");
+                            if(source_list[source_name].equals("google-news-fr")){
+                                //Log.e(TAG, "source is google news");
+                                if(i%2==0){
+                                    map.put("imageView_left", String.valueOf(R.drawable.google_news_logo));
+                                    map.put("imageView_right", "");
+                                }
+                                else{
+                                    map.put("imageView_right", String.valueOf(R.drawable.google_news_logo));
+                                    map.put("imageView_left", "");
+                                }
+                            }
+                            if(source_list[source_name].equals("le-monde")){
+                                //Log.e(TAG, "source is le monde");
+                                if(i%2==0){
+                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
+                                    map.put("imageView_right", "");
+                                }
+                                else{
+                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
+                                    map.put("imageView_right", "");
+                                }
+                            }
+                        }
+                        else{
+                            Bitmap mIcon11;
+                            try {
+                                InputStream in = new java.net.URL(image_url).openStream();
+                                mIcon11 = BitmapFactory.decodeStream(in);
+                                pictures.add(mIcon11);
+                            } catch (Exception e) {
+                                Log.e("Image dwnlding error : ", e.getMessage());
+                                e.printStackTrace();
+                            }
+                        }
+                        listItem.add(map);
+                    }
+
+                    return true;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            return false;
+        }
+
+        @Override
+        protected void onPostExecute(Boolean result) {
+            DataHolder.getInstance().setData(listItem);
+            DataHolder.getInstance().setPictures(pictures);
+            super.onPostExecute(result);
+            mSchedule.notifyDataSetChanged();
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
     }
 }

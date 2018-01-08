@@ -20,7 +20,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".NewsListActivity" />
-        <activity android:name=".NewsDetails"></activity>
+        <activity android:name=".NewsDetails" />
+        <activity android:name=".WebActivity"></activity>
     </application>
 
 </manifest>

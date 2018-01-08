@@ -224,6 +224,8 @@ public class SplashScreenActivity extends AppCompatActivity {
             DataHolder.getInstance().setData(listItem);
             DataHolder.getInstance().setPictures(pictures);
             Intent nonIntent = new Intent(SplashScreenActivity.this, NewsListActivity.class);
+            nonIntent.putExtra("source_name",source_name);
+            nonIntent.putExtra("source_list",source_list);
             startActivity(nonIntent);
             finish();
             super.onPostExecute(result);

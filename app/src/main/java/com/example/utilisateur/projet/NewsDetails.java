@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -54,8 +56,9 @@ public class NewsDetails extends AppCompatActivity {
                 Button button = (Button) findViewById(R.id.button);
                 button.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(urlLink));
-                        startActivity(intent);
+                        Intent nonIntent = new Intent(NewsDetails.this, WebActivity.class);
+                        nonIntent.putExtra("url",urlLink);
+                        startActivity(nonIntent);
                     }
                 });
             }
