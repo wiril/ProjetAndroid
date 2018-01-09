@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.webkit.URLUtil;
 import android.widget.ProgressBar;
 
 import org.apache.http.HttpEntity;
@@ -26,6 +27,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -39,6 +42,7 @@ public class SplashScreenActivity extends AppCompatActivity {
     private ArrayList<Bitmap> pictures = new ArrayList<Bitmap>();
     private ProgressBar progressBar;
     private double progressStatus = 0.;
+    private int IMAGE_MAX_SIZE = 600;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -105,6 +109,7 @@ public class SplashScreenActivity extends AppCompatActivity {
                         source_list[i] = firsttheObject.getJSONObject(i).getString("id");
                     }
                 }
+                Log.e("source",source_list[source_name]);
                 HttpGet httppost = new HttpGet("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+source_list[source_name]);
                 HttpClient httpclient = new DefaultHttpClient();
                 HttpResponse response = httpclient.execute(httppost);
@@ -143,61 +148,89 @@ public class SplashScreenActivity extends AppCompatActivity {
                         map.put("description", theObject.getJSONObject(i).getString("description"));
                         map.put("url", theObject.getJSONObject(i).getString("url"));
 
-                        if(source_list[source_name].equals("le-monde")){
-                            map.put("source", "Le Monde");
-                        }
-                        else if(source_list[source_name].equals("google-news-fr")){
-                            map.put("source", "Google News");
-                        }
-                        else if(source_list[source_name].equals("lequipe")){
-                            map.put("source", "L'Équipe");
-                        }
-                        else if(source_list[source_name].equals("les-echos")){
-                            map.put("source", "Les Échos");
-                        }
-                        else if(source_list[source_name].equals("liberation")){
-                            map.put("source", "Libération");
+                        switch (source_list[source_name]) {
+                            case "le-monde":
+                                map.put("source", "Le Monde");
+                                break;
+                            case "google-news-fr":
+                                map.put("source", "Google News");
+                                break;
+                            case "lequipe":
+                                map.put("source", "L'Équipe");
+                                break;
+                            case "les-echos":
+                                map.put("source", "Les Échos");
+                                break;
+                            case "liberation":
+                                map.put("source", "Libération");
+                                break;
                         }
 
                         String image_url = theObject.getJSONObject(i).getString("urlToImage");
                         //Log.e("image_url",image_url);
-                        if (image_url =="null"){
+                        char[] image_url_chars = image_url.toCharArray();
+                        Bitmap mIcon11 = null;
+                        int imageStatus = 200;
+                        if(URLUtil.isValidUrl(image_url)) {
+                            HttpGet imageHttppost = new HttpGet(image_url);
+                            HttpClient imageHttpclient = new DefaultHttpClient();
+                            HttpResponse imageResponse = imageHttpclient.execute(imageHttppost);
+                            imageStatus = imageResponse.getStatusLine().getStatusCode();
+                        }
+                        if (imageStatus!=200 || !URLUtil.isValidUrl(image_url)
+                                ||(image_url_chars[image_url_chars.length-4]!='.'&&image_url_chars[image_url_chars.length-5]!='.')
+                                ||(image_url_chars[image_url_chars.length-3]=='s')&&image_url_chars[image_url_chars.length-2]=='v'&&image_url_chars[image_url_chars.length-1]=='g'){
                             //Log.e(TAG, "image url is 'null'");
-                            if(source_list[source_name].equals("google-news-fr")){
-                                //Log.e(TAG, "source is google news");
-                                if(i%2==0){
-                                    map.put("imageView_left", String.valueOf(R.drawable.google_news_logo));
-                                    map.put("imageView_right", "");
-                                }
-                                else{
-                                    map.put("imageView_right", String.valueOf(R.drawable.google_news_logo));
-                                    map.put("imageView_left", "");
-                                }
+                            switch(source_list[source_name]){
+                                case "google-news-fr":
+                                    mIcon11 = BitmapFactory.decodeResource(SplashScreenActivity.this.getResources(), R.drawable.google_news_logo);
+                                    break;
+                                case "le-monde":
+                                    mIcon11 = BitmapFactory.decodeResource(SplashScreenActivity.this.getResources(), R.drawable.le_monde);
+                                    break;
+                                case "lequipe":
+                                    mIcon11 = BitmapFactory.decodeResource(SplashScreenActivity.this.getResources(), R.drawable.lequipe);
+                                    break;
+                                case "les-echos":
+                                    mIcon11 = BitmapFactory.decodeResource(SplashScreenActivity.this.getResources(), R.drawable.les_echos);
+                                    break;
+                                case "liberation":
+                                    mIcon11 = BitmapFactory.decodeResource(SplashScreenActivity.this.getResources(), R.drawable.liberation);
+                                    break;
                             }
-                            if(source_list[source_name].equals("le-monde")){
-                                //Log.e(TAG, "source is le monde");
-                                if(i%2==0){
-                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
-                                    map.put("imageView_right", "");
-                                }
-                                else{
-                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
-                                    map.put("imageView_right", "");
-                                }
-                            }
+                            pictures.add(mIcon11);
                         }
                         else{
-                            Bitmap mIcon11;
                             try {
                                 InputStream in = new java.net.URL(image_url).openStream();
-                                mIcon11 = BitmapFactory.decodeStream(in);
+                                //Decode image size
+                                BitmapFactory.Options o = new BitmapFactory.Options();
+                                o.inJustDecodeBounds = true;
+                                BitmapFactory.decodeStream(in, null, o);
+                                int scale = 1;
+                                if (o.outHeight > IMAGE_MAX_SIZE || o.outWidth > IMAGE_MAX_SIZE) {
+                                    scale = (int) Math.pow(2, (int) Math.ceil(Math.log(IMAGE_MAX_SIZE /
+                                            (double) Math.max(o.outHeight, o.outWidth)) / Math.log(0.5)));
+                                }
+                                //Decode with inSampleSize
+                                BitmapFactory.Options options = new BitmapFactory.Options();
+                                options.inSampleSize = scale;
+                                in = new java.net.URL(image_url).openStream();
+                                mIcon11 = BitmapFactory.decodeStream(in,null,options);
                                 pictures.add(mIcon11);
+                                in.close();
                             } catch (Exception e) {
                                 Log.e("Image dwnlding error : ", e.getMessage());
                                 e.printStackTrace();
                             }
                         }
-                        listItem.add(map);
+                        final HashMap<String, String> finalMap = map;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                listItem.add(finalMap);
+                            }
+                        });
                         progressStatus+=100./articles_number;
                         if (progressStatus<=100){
                             runOnUiThread(new Runnable() {

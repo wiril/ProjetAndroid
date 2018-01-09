@@ -19,6 +19,7 @@ import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.URLUtil;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.Checkable;
@@ -54,19 +55,19 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     private static ArrayList<HashMap<String, String>> listItem;
     private static ArrayList<Bitmap> pictures;
     private View mFooterView;
-    private boolean mIsLoading = false;
+    private static boolean mIsLoading = false;
     private boolean mWasLoading = false;
     private Handler mHandler;
     private MirrorAdapter mSchedule;
     private static int numberOfPages = 1;
     private String[] source_list;
     private static int source_name;
+    private int IMAGE_MAX_SIZE = 600;
 
     private Runnable mAddItemsRunnable = new Runnable() {
         @Override
         public void run() {
             mSchedule.addMoreItems();
-            mIsLoading = false;
         }
     };
 
@@ -95,9 +96,9 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     public void onScroll(AbsListView view, int firstVisibleItem,
                          int visibleItemCount, int totalItemCount) {
         if (!mIsLoading) {
-            if (totalItemCount <= firstVisibleItem + visibleItemCount) {
+            if (totalItemCount-4<= firstVisibleItem + visibleItemCount) {
                 mIsLoading = true;
-                mHandler.postDelayed(mAddItemsRunnable, 1000);
+                mHandler.postDelayed(mAddItemsRunnable, 1);
             }
         }
     }
@@ -107,23 +108,25 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
         // Ignore
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        if (mWasLoading) {
-            mWasLoading = false;
-            mIsLoading = true;
-            mHandler.postDelayed(mAddItemsRunnable, 1000);
-        }
-    }
+    //@Override
+    //public void onStart() {
+    //    super.onStart();
+    //    Log.e("On start","...");
+    //    if (mWasLoading) {
+    //        mWasLoading = false;
+    //        mIsLoading = true;
+    //        mHandler.postDelayed(mAddItemsRunnable, 1000);
+    //    }
+    //}
 
-    @Override
-    public void onStop() {
-        super.onStop();
-        mHandler.removeCallbacks(mAddItemsRunnable);
-        mWasLoading = mIsLoading;
-        mIsLoading = false;
-    }
+    //@Override
+    //public void onStop() {
+    //    super.onStop();
+    //    Log.e("On stop","...");
+    //    mHandler.removeCallbacks(mAddItemsRunnable);
+    //    mWasLoading = mIsLoading;
+    //    mIsLoading = false;
+    //}
 
     //similar structure with SimpleAdapter :
     public class MirrorAdapter extends BaseAdapter implements Filterable, ThemedSpinnerAdapter {
@@ -264,20 +267,18 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             final int count = to.length;
 
             for (int i = 0; i < count; i++) {
-                if (!pictures.isEmpty()){
-                    final ImageView imv;
-                    if(position%2==0){
-                        imv = (ImageView) view.findViewById(R.id.imageView_left);
-                        view.findViewById(R.id.imageView_right).setVisibility(View.GONE);
-                    }
-                    else{
-                        imv = (ImageView) view.findViewById(R.id.imageView_right);
-                        view.findViewById(R.id.imageView_left).setVisibility(View.GONE);
-                    }
-                    //Log.e("picture is null "," "+(pictures.get(position)==null));
-                    imv.setImageBitmap(pictures.get(position));
-                    imv.setVisibility(View.VISIBLE);
+                final ImageView imv;
+                if(position%2==0){
+                    imv = (ImageView) view.findViewById(R.id.imageView_left);
+                    view.findViewById(R.id.imageView_right).setVisibility(View.GONE);
                 }
+                else{
+                    imv = (ImageView) view.findViewById(R.id.imageView_right);
+                    view.findViewById(R.id.imageView_left).setVisibility(View.GONE);
+                }
+                //Log.e("picture is null "," "+(pictures.get(position)==null));
+                imv.setImageBitmap(pictures.get(position));
+                imv.setVisibility(View.VISIBLE);
                 final View v = view.findViewById(to[i]);
                 if (v != null) {
                     final Object data = dataSet.get(from[i]);
@@ -526,7 +527,6 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
 
     @Override
     protected void onListItemClick(ListView l, View v, int position, long id) {
-        //faudra aussi gérer la transmission de l'image. 2 solutions : la retélécharger, ou réussir à la carry d'une manière ou d'une autre.
         HashMap<String, String> map = listItem.get(position);
         ImageView imv = (ImageView) v.findViewById(R.id.imageView_left);
         if(imv.getVisibility()== View.GONE){
@@ -610,45 +610,73 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
 
                         String image_url = theObject.getJSONObject(i).getString("urlToImage");
                         //Log.e("image_url",image_url);
-                        if (image_url.equals("null")){
+                        char[] image_url_chars = image_url.toCharArray();
+                        Bitmap mIcon11 = null;
+                        int imageStatus = 200;
+                        if(URLUtil.isValidUrl(image_url)) {
+                            HttpGet imageHttppost = new HttpGet(image_url);
+                            HttpClient imageHttpclient = new DefaultHttpClient();
+                            HttpResponse imageResponse = imageHttpclient.execute(imageHttppost);
+                            imageStatus = imageResponse.getStatusLine().getStatusCode();
+                        }
+                        if (imageStatus!=200 || !URLUtil.isValidUrl(image_url)
+                                ||(image_url_chars[image_url_chars.length-4]!='.'&&image_url_chars[image_url_chars.length-5]!='.')
+                                ||(image_url_chars[image_url_chars.length-3]=='s')&&image_url_chars[image_url_chars.length-2]=='v'&&image_url_chars[image_url_chars.length-1]=='g') {
                             //Log.e(TAG, "image url is 'null'");
-                            if(source_list[source_name].equals("google-news-fr")){
-                                //Log.e(TAG, "source is google news");
-                                if(i%2==0){
-                                    map.put("imageView_left", String.valueOf(R.drawable.google_news_logo));
-                                    map.put("imageView_right", "");
-                                }
-                                else{
-                                    map.put("imageView_right", String.valueOf(R.drawable.google_news_logo));
-                                    map.put("imageView_left", "");
-                                }
+                            switch (source_list[source_name]) {
+                                case "google-news-fr":
+                                    mIcon11 = BitmapFactory.decodeResource(NewsListActivity.this.getResources(), R.drawable.google_news_logo);
+                                    break;
+                                case "le-monde":
+                                    mIcon11 = BitmapFactory.decodeResource(NewsListActivity.this.getResources(), R.drawable.le_monde);
+                                    break;
+                                case "lequipe":
+                                    mIcon11 = BitmapFactory.decodeResource(NewsListActivity.this.getResources(), R.drawable.lequipe);
+                                    break;
+                                case "les-echos":
+                                    mIcon11 = BitmapFactory.decodeResource(NewsListActivity.this.getResources(), R.drawable.les_echos);
+                                    break;
+                                case "liberation":
+                                    mIcon11 = BitmapFactory.decodeResource(NewsListActivity.this.getResources(), R.drawable.liberation);
+                                    break;
                             }
-                            if(source_list[source_name].equals("le-monde")){
-                                //Log.e(TAG, "source is le monde");
-                                if(i%2==0){
-                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
-                                    map.put("imageView_right", "");
-                                }
-                                else{
-                                    map.put("imageView_left", String.valueOf(R.drawable.le_monde));
-                                    map.put("imageView_right", "");
-                                }
-                            }
+                            pictures.add(mIcon11);
                         }
                         else{
-                            Bitmap mIcon11;
                             try {
                                 InputStream in = new java.net.URL(image_url).openStream();
-                                mIcon11 = BitmapFactory.decodeStream(in);
+                                //Decode image size
+                                BitmapFactory.Options o = new BitmapFactory.Options();
+                                o.inJustDecodeBounds = true;
+                                BitmapFactory.decodeStream(in, null, o);
+                                int scale = 1;
+                                if (o.outHeight > IMAGE_MAX_SIZE || o.outWidth > IMAGE_MAX_SIZE) {
+                                    scale = (int) Math.pow(2, (int) Math.ceil(Math.log(IMAGE_MAX_SIZE /
+                                            (double) Math.max(o.outHeight, o.outWidth)) / Math.log(0.5)));
+                                }
+                                //Decode with inSampleSize
+                                BitmapFactory.Options options = new BitmapFactory.Options();
+                                options.inSampleSize = scale;
+                                in = new java.net.URL(image_url).openStream();
+                                mIcon11 = BitmapFactory.decodeStream(in,null,options);
                                 pictures.add(mIcon11);
+                                in.close();
                             } catch (Exception e) {
                                 Log.e("Image dwnlding error : ", e.getMessage());
                                 e.printStackTrace();
                             }
                         }
-                        listItem.add(map);
+                        //Solution a priori temporaire au bug de toucher l'écran alors que la liste est en cours de changement.
+                        final HashMap<String, String> finalMap = map;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                listItem.add(finalMap);
+                                mSchedule.notifyDataSetChanged();
+                            }
+                        });
+                        //_______________________________________
                     }
-
                     return true;
                 }
             } catch (IOException e) {
@@ -661,10 +689,9 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
 
         @Override
         protected void onPostExecute(Boolean result) {
-            DataHolder.getInstance().setData(listItem);
-            DataHolder.getInstance().setPictures(pictures);
-            super.onPostExecute(result);
             mSchedule.notifyDataSetChanged();
+            mIsLoading = false;
+            super.onPostExecute(result);
         }
 
         @Override
