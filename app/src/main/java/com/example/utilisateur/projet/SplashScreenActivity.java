@@ -5,6 +5,7 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.ConnectivityManager;
@@ -36,23 +37,43 @@ import java.util.HashMap;
 
 public class SplashScreenActivity extends AppCompatActivity {
 
-    private int source_name;
     private String[] source_list;
     private ArrayList<HashMap<String, String>> listItem;
     private ArrayList<Bitmap> pictures = new ArrayList<Bitmap>();
     private ProgressBar progressBar;
     private double progressStatus = 0.;
+    private static int numberOfPages = 1;
+
     private int IMAGE_MAX_SIZE = 600;
+    private int source_name = 1;
+    private int defaultSource = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash_screen);
 
+        SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
+        source_name = sharedPref.getInt(getString(R.string.source_name), defaultSource);
+
+        Bundle b = getIntent().getExtras();
+        if(b!=null) {
+            if(b.get("numberOfPages")!=null){
+                numberOfPages += (int) b.get("numberOfPages");
+            }
+            if(b.get("sourceName")!=null){
+                source_name = (int) b.get("sourceName");
+            }
+        }
+
+        sharedPref = this.getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putInt(getString(R.string.source_name), source_name);
+        editor.apply();
+
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
 
         listItem = new ArrayList<HashMap<String, String>>();
-        source_name = 1;
 
         if(networkAvailable()){
             new SplashScreenActivity.JSONAsyncTask("https://newsapi.org/v2/sources?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr").execute();
@@ -110,7 +131,7 @@ public class SplashScreenActivity extends AppCompatActivity {
                     }
                 }
                 Log.e("source",source_list[source_name]);
-                HttpGet httppost = new HttpGet("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+source_list[source_name]);
+                HttpGet httppost = new HttpGet("https://newsapi.org/v2/everything?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr&sources="+source_list[source_name]+"&page="+numberOfPages);
                 HttpClient httpclient = new DefaultHttpClient();
                 HttpResponse response = httpclient.execute(httppost);
 
@@ -259,6 +280,8 @@ public class SplashScreenActivity extends AppCompatActivity {
             Intent nonIntent = new Intent(SplashScreenActivity.this, NewsListActivity.class);
             nonIntent.putExtra("source_name",source_name);
             nonIntent.putExtra("source_list",source_list);
+            nonIntent.putExtra("numberOfPages",numberOfPages);
+            numberOfPages = 1;
             startActivity(nonIntent);
             finish();
             super.onPostExecute(result);

@@ -1,5 +1,6 @@
 package com.example.utilisateur.projet;
 
+import android.app.LauncherActivity;
 import android.app.ListActivity;
 import android.app.ProgressDialog;
 import android.content.Context;
@@ -21,12 +22,16 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.URLUtil;
 import android.widget.AbsListView;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.Checkable;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.ThemedSpinnerAdapter;
 import android.widget.Toast;
@@ -55,6 +60,7 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     private static ArrayList<HashMap<String, String>> listItem;
     private static ArrayList<Bitmap> pictures;
     private View mFooterView;
+    private View mHeaderView;
     private static boolean mIsLoading = false;
     private boolean mWasLoading = false;
     private Handler mHandler;
@@ -63,6 +69,7 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     private String[] source_list;
     private static int source_name;
     private int IMAGE_MAX_SIZE = 600;
+    private int max_simult_pages = 20;
 
     private Runnable mAddItemsRunnable = new Runnable() {
         @Override
@@ -80,14 +87,102 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
         Bundle b = getIntent().getExtras();
         source_list = (String[]) b.get("source_list");
         source_name = (int) b.get("source_name");
+        numberOfPages = (int) b.get("numberOfPages");
 
         mSchedule = new MirrorAdapter(this.getBaseContext(), listItem,
                 R.layout.activity_main,
                 new String[]{"title", "author", "date", "imageView_left", "imageView_right"}, new int[]{R.id.title,
                 R.id.author, R.id.date, R.id.imageView_left, R.id.imageView_right});
         mHandler = new Handler();
+        mHeaderView = LayoutInflater.from(this).inflate(R.layout.spinner_view, null);
+        TextView tv = (TextView) mHeaderView.findViewById(R.id.source_name);
+        tv.setText("Liste des actualités");
+        Spinner sv = (Spinner) mHeaderView.findViewById(R.id.spinner);
+        final ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item);
+        adapter.clear();
+        switch (source_list[source_name]) {
+            case "le-monde":
+                adapter.add("Le Monde");
+                adapter.add("Google News");
+                adapter.add("L' Équipe");
+                adapter.add("Les Échos");
+                adapter.add("Libération");
+                break;
+            case "google-news-fr":
+                adapter.add("Google News");
+                adapter.add("Le Monde");
+                adapter.add("L' Équipe");
+                adapter.add("Les Échos");
+                adapter.add("Libération");
+                break;
+            case "lequipe":
+                adapter.add("L' Équipe");
+                adapter.add("Google News");
+                adapter.add("Le Monde");
+                adapter.add("Les Échos");
+                adapter.add("Libération");
+                break;
+            case "les-echos":
+                adapter.add("Les Échos");
+                adapter.add("Google News");
+                adapter.add("Le Monde");
+                adapter.add("L' Équipe");
+                adapter.add("Libération");
+                break;
+            case "liberation":
+                adapter.add("Libération");
+                adapter.add("Google News");
+                adapter.add("Le Monde");
+                adapter.add("L' Équipe");
+                adapter.add("Les Échos");
+                break;
+        }
+        sv.setAdapter(adapter);
+        sv.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position!=0){
+                    String title = adapter.getItem(position);
+                    switch(title){
+                        case "Google News":
+                            source_name = 0;
+                            break;
+                        case "Le Monde":
+                            source_name = 1;
+                            break;
+                        case "L' Équipe":
+                            source_name = 2;
+                            break;
+                        case "Les Échos":
+                            source_name = 3;
+                            break;
+                        case "Libération":
+                            source_name = 4;
+                            break;
+                    }
+                    Intent nonIntent = new Intent(NewsListActivity.this, SplashScreenActivity.class);
+                    nonIntent.putExtra("numberOfPages",0);
+                    nonIntent.putExtra("sourceName",source_name);
+                    startActivity(nonIntent);
+                    finish();
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        getListView().addHeaderView(mHeaderView);
         mFooterView = LayoutInflater.from(this).inflate(R.layout.loading_view, null);
         getListView().addFooterView(mFooterView);
+        Button button = (Button) mFooterView.findViewById(R.id.reloadButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Intent nonIntent = new Intent(NewsListActivity.this, SplashScreenActivity.class);
+                nonIntent.putExtra("numberOfPages",numberOfPages);
+                startActivity(nonIntent);
+                finish();
+            }
+        });
         setListAdapter(mSchedule);
         getListView().setOnScrollListener(this);
     }
@@ -95,7 +190,7 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     @Override
     public void onScroll(AbsListView view, int firstVisibleItem,
                          int visibleItemCount, int totalItemCount) {
-        if (!mIsLoading) {
+        if (!mIsLoading&&numberOfPages%max_simult_pages!=0) {
             if (totalItemCount-4<= firstVisibleItem + visibleItemCount) {
                 mIsLoading = true;
                 mHandler.postDelayed(mAddItemsRunnable, 1);
@@ -141,27 +236,11 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
         private int mResource;
         private int mDropDownResource;
 
-        /** Layout inflater used for {@link #getDropDownView(int, View, ViewGroup)}. */
         private LayoutInflater mDropDownInflater;
 
         private SimpleFilter mFilter;
         private ArrayList<Map<String, ?>> mUnfilteredData;
 
-        /**
-         * Constructor
-         *
-         * @param context The context where the View associated with this SimpleAdapter is running
-         * @param data A List of Maps. Each entry in the List corresponds to one row in the list. The
-         *        Maps contain the data for each row, and should include all the entries specified in
-         *        "from"
-         * @param resource Resource identifier of a view layout that defines the views for this list
-         *        item. The layout file should include at least those named views defined in "to"
-         * @param from A list of column names that will be added to the Map associated with each
-         *        item.
-         * @param to The views that should display column in the "from" parameter. These should all be
-         *        TextViews. The first N views in this list are given the values of the first N columns
-         *        in the from parameter.
-         */
         public MirrorAdapter(Context context, List<? extends Map<String, ?>> data,
                              @LayoutRes int resource, String[] from, @IdRes int[] to) {
             mData = data;
@@ -171,30 +250,18 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             mInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         }
 
-        /**
-         * @see android.widget.Adapter#getCount()
-         */
         public int getCount() {
             return mData.size();
         }
 
-        /**
-         * @see android.widget.Adapter#getItem(int)
-         */
         public Object getItem(int position) {
             return mData.get(position);
         }
 
-        /**
-         * @see android.widget.Adapter#getItemId(int)
-         */
         public long getItemId(int position) {
             return position;
         }
 
-        /**
-         * @see android.widget.Adapter#getView(int, View, ViewGroup)
-         */
         public View getView(int position, View convertView, ViewGroup parent) {
             return createViewFromResource(mInflater, position, convertView, parent, mResource);
         }
@@ -211,27 +278,10 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             return v;
         }
 
-        /**
-         * <p>Sets the layout resource to create the drop down views.</p>
-         *
-         * @param resource the layout resource defining the drop down views
-         * @see #getDropDownView(int, android.view.View, android.view.ViewGroup)
-         */
         public void setDropDownViewResource(int resource) {
             mDropDownResource = resource;
         }
 
-        /**
-         * Sets the {@link android.content.res.Resources.Theme} against which drop-down views are
-         * inflated.
-         * <p>
-         * By default, drop-down views are inflated against the theme of the
-         * {@link Context} passed to the adapter's constructor.
-         *
-         * @param theme the theme against which to inflate drop-down views or
-         *              {@code null} to use the theme from the adapter's context
-         * @see #getDropDownView(int, View, ViewGroup)
-         */
         @Override
         public void setDropDownViewTheme(Resources.Theme theme) {
             if (theme == null) {
@@ -333,63 +383,18 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             }
         }
 
-        /**
-         * Returns the {@link android.widget.SimpleAdapter.ViewBinder} used to bind data to views.
-         *
-         * @return a ViewBinder or null if the binder does not exist
-         *
-         * @see #setViewBinder(android.widget.SimpleAdapter.ViewBinder)
-         */
         public android.widget.SimpleAdapter.ViewBinder getViewBinder() {
             return mViewBinder;
         }
 
-        /**
-         * Sets the binder used to bind data to views.
-         *
-         * @param viewBinder the binder used to bind data to views, can be null to
-         *        remove the existing binder
-         *
-         * @see #getViewBinder()
-         */
         public void setViewBinder(android.widget.SimpleAdapter.ViewBinder viewBinder) {
             mViewBinder = viewBinder;
         }
 
-        /**
-         * Called by bindView() to set the image for an ImageView but only if
-         * there is no existing ViewBinder or if the existing ViewBinder cannot
-         * handle binding to an ImageView.
-         *
-         * This method is called instead of {@link #setViewImage(ImageView, String)}
-         * if the supplied data is an int or Integer.
-         *
-         * @param v ImageView to receive an image
-         * @param value the value retrieved from the data set
-         *
-         * @see #setViewImage(ImageView, String)
-         */
         public void setViewImage(ImageView v, int value) {
             v.setImageResource(value);
         }
 
-        /**
-         * Called by bindView() to set the image for an ImageView but only if
-         * there is no existing ViewBinder or if the existing ViewBinder cannot
-         * handle binding to an ImageView.
-         *
-         * By default, the value will be treated as an image resource. If the
-         * value cannot be used as an image resource, the value is used as an
-         * image Uri.
-         *
-         * This method is called instead of {@link #setViewImage(ImageView, int)}
-         * if the supplied data is not an int or Integer.
-         *
-         * @param v ImageView to receive an image
-         * @param value the value retrieved from the data set
-         *
-         * @see #setViewImage(ImageView, int)
-         */
         public void setViewImage(ImageView v, String value) {
             try {
                 v.setImageResource(Integer.parseInt(value));
@@ -399,14 +404,6 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             }
         }
 
-        /**
-         * Called by bindView() to set the text for a TextView but only if
-         * there is no existing ViewBinder or if the existing ViewBinder cannot
-         * handle binding to a TextView.
-         *
-         * @param v TextView to receive text
-         * @param text the text to be set for the TextView
-         */
         public void setViewText(TextView v, String text) {
             v.setText(text);
         }
@@ -423,42 +420,6 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
             new NewsListActivity.JSONAsyncTask("https://newsapi.org/v2/sources?apiKey=d31f5fa5f03443dd8a1b9e3fde92ec34&language=fr").execute();
         }
 
-        /**
-         * This class can be used by external clients of SimpleAdapter to bind
-         * values to views.
-         *
-         * You should use this class to bind values to views that are not
-         * directly supported by SimpleAdapter or to change the way binding
-         * occurs for views supported by SimpleAdapter.
-         *
-         * @see android.widget.SimpleAdapter#setViewImage(ImageView, int)
-         * @see android.widget.SimpleAdapter#setViewImage(ImageView, String)
-         * @see android.widget.SimpleAdapter#setViewText(TextView, String)
-         */
-        //public interface ViewBinder {
-            /**
-             * Binds the specified data to the specified view.
-             *
-             * When binding is handled by this ViewBinder, this method must return true.
-             * If this method returns false, SimpleAdapter will attempts to handle
-             * the binding on its own.
-             *
-             * @param view the view to bind the data to
-             * @param data the data to bind to the view
-             * @param textRepresentation a safe String representation of the supplied data:
-             *        it is either the result of data.toString() or an empty String but it
-             *        is never null
-             *
-             * @return true if the data was bound to the view, false otherwise
-             */
-        //    boolean setViewValue(View view, Object data, String textRepresentation);
-        //}
-
-        /**
-         * <p>An array filters constrains the content of the array adapter with
-         * a prefix. Each item that does not start with the supplied prefix
-         * is removed from the list.</p>
-         */
         private class SimpleFilter extends Filter {
 
             @Override
@@ -527,7 +488,7 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
 
     @Override
     protected void onListItemClick(ListView l, View v, int position, long id) {
-        HashMap<String, String> map = listItem.get(position);
+        HashMap<String, String> map = listItem.get(position-1);
         ImageView imv = (ImageView) v.findViewById(R.id.imageView_left);
         if(imv.getVisibility()== View.GONE){
             imv = (ImageView) v.findViewById(R.id.imageView_right);
@@ -690,6 +651,10 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
         @Override
         protected void onPostExecute(Boolean result) {
             mSchedule.notifyDataSetChanged();
+            if(numberOfPages%max_simult_pages==0){
+                mFooterView.findViewById(R.id.progressBar2).setVisibility(View.GONE);
+                mFooterView.findViewById(R.id.reloadButton).setVisibility(View.VISIBLE);
+            }
             mIsLoading = false;
             super.onPostExecute(result);
         }
