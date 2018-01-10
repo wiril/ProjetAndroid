@@ -1,6 +1,5 @@
 package com.example.utilisateur.projet;
 
-import android.app.LauncherActivity;
 import android.app.ListActivity;
 import android.app.ProgressDialog;
 import android.content.Context;
@@ -11,7 +10,6 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
-import android.provider.ContactsContract;
 import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
 import android.os.Bundle;
@@ -34,7 +32,6 @@ import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.ThemedSpinnerAdapter;
-import android.widget.Toast;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -62,7 +59,6 @@ public class NewsListActivity extends ListActivity implements AbsListView.OnScro
     private View mFooterView;
     private View mHeaderView;
     private static boolean mIsLoading = false;
-    private boolean mWasLoading = false;
     private Handler mHandler;
     private MirrorAdapter mSchedule;
     private static int numberOfPages = 1;
